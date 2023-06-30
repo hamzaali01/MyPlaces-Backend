@@ -62,7 +62,7 @@ const signup = async (req, res, next) => {
   const createdUser = User({
     name,
     email,
-    image: req.file.path,
+    image: "",//req.file.path,
     password: hashedPassword,
     places: [],
   });
@@ -70,6 +70,7 @@ const signup = async (req, res, next) => {
   try {
     await createdUser.save();
   } catch (err) {
+    console.log(err)
     const error = new HttpError("Signing up failed, please try again.", 500);
     return next(error);
   }
