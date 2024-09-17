@@ -12,31 +12,30 @@ const cors = require("cors");
 
 const app = express();
 
-app.use(cors());
+// Allow CORS only from your frontend URL
+const allowedOrigins = ['https://myplaces-8a39f.web.app'];
+
+app.use(cors({
+  origin: allowedOrigins, // Allows your frontend to access the API
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
 
 app.use(bodyParser.json());
 
 app.use("/uploads/images", express.static(path.join("uploads", "images")));
 
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization "
-  );
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE");
-
-  next();
-});
-
+// Routes
 app.use("/api/places", placesRoutes);
 app.use("/api/users", usersRoutes);
 
+// Error handling for unknown routes
 app.use((req, res, next) => {
   const error = new HttpError("Could not find this route.", 404);
   throw error;
 });
 
+// General error handling middleware
 app.use((error, req, res, next) => {
   if (req.file) {
     fs.unlink(req.file.path, (err) => {
@@ -47,9 +46,10 @@ app.use((error, req, res, next) => {
     return next(error);
   }
   res.status(error.code || 500);
-  res.json({ message: error.message || "An unknown error occured." });
+  res.json({ message: error.message || "An unknown error occurred." });
 });
 
+// Connect to MongoDB and start the server
 mongoose
   .connect(
        `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.h7d4zwb.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
@@ -60,6 +60,7 @@ mongoose
   .catch((err) => {
     console.log(err);
   });
+
 
  
 
