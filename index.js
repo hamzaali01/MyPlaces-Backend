@@ -10,16 +10,14 @@ const placesRoutes = require("./routes/places-routes");
 const HttpError = require("./models/http-error");
 const cors = require("cors");
 
+const corsOptions ={
+   origin:'*', 
+   credentials:true,            //access-control-allow-credentials:true
+   optionSuccessStatus:200,
+}
 const app = express();
 
-// Allow CORS only from your frontend URL
-const allowedOrigins = ['https://myplaces-8a39f.web.app'];
-
-app.use(cors({
-  origin: allowedOrigins, // Allows your frontend to access the API
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
-}));
+app.use(cors(corsOptions))
 
 app.use(bodyParser.json());
 
