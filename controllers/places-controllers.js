@@ -90,6 +90,9 @@ const createPlace = async (req, res, next) => {
     await imageRef.save(image, {
       metadata: { contentType: req.file.mimetype },
     });
+
+    const res = await imageRef.makePublic();
+
     const imageUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/places/${imageName}`;
 
     const createdPlace = new Place({
