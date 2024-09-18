@@ -1,7 +1,8 @@
 const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
+const { bucket } = require("../firebase-config");
 const jwt = require("jsonwebtoken");
-
+const { v1: uuidv1 } = require('uuid');
 const HttpError = require("../models/http-error");
 const User = require("../models/user");
 
@@ -17,6 +18,12 @@ const getUsers = async (req, res, next) => {
     return next(error);
   }
   res.json({ users: users.map((user) => user.toObject({ getters: true })) });
+};
+
+const MIME_TYPE_MAP = {
+  "image/png": "png",
+  "image/jpeg": "jpeg",
+  "image/jpg": "jpg",
 };
 
 // Helper function to upload image to Firebase
@@ -90,7 +97,6 @@ const signup = async (req, res, next) => {
   try {
     await createdUser.save();
   } catch (err) {
-    console.log(err)
     const error = new HttpError("Signing up failed, please try again.", 500);
     return next(error);
   }
