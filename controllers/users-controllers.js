@@ -30,9 +30,14 @@ const MIME_TYPE_MAP = {
 const uploadImageToFirebase = async (imageBuffer, mimetype) => {
   const imageName = uuidv1() + '.' + MIME_TYPE_MAP[mimetype];
   const imageRef = bucket.file('users/' + imageName);
+
   await imageRef.save(imageBuffer, {
     metadata: { contentType: mimetype },
   });
+
+  const res = await imageRef.makePublic();
+
+
   return `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/users/${imageName}`;
 };
 
