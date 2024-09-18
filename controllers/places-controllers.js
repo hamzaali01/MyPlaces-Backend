@@ -1,8 +1,8 @@
 const fs = require("fs");
-
+const { bucket } = require("../firebase-config");
 const { validationResult } = require("express-validator");
 const mongoose = require("mongoose");
-
+const { v1: uuidv1 } = require('uuid');
 const HttpError = require("../models/http-error");
 const getCoordsForAddress = require("../util/location");
 const Place = require("../models/place");
@@ -60,16 +60,19 @@ const getPlacesByUserId = async (req, res, next) => {
   });
 };
 
+const MIME_TYPE_MAP = {
+  "image/png": "png",
+  "image/jpeg": "jpeg",
+  "image/jpg": "jpg",
+};
+
 const createPlace = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return next(
-      new HttpError("Invalid inputs passed, please check your data.", 422)
-    );
+    return next(new HttpError("Invalid inputs passed, please check your data.", 422));
   }
 
-  const { title, description, address } = req.body; //const title = req.body.title  iss trhan krke bhi aik aik krke krskte they but khuwari
-
+  const { title, description, address } = req.body;
   let coordinates;
   try {
     coordinates = await getCoordsForAddress(address);
@@ -77,45 +80,56 @@ const createPlace = async (req, res, next) => {
     return next(error);
   }
 
-  const createdPlace = new Place({
-    title,
-    description,
-    address,
-    location: coordinates,
-    image: req.file.path,
-    creator: req.userData.userId,
-  });
 
-  let user;
+  // Upload file to Firebase Storage
+  const image = req.file.buffer;
+  const imageName = uuidv1() + '.' + MIME_TYPE_MAP[req.file.mimetype];
+  const imageRef = bucket.file('places/' + imageName);
 
   try {
-    user = await User.findById(req.userData.userId);
-  } catch (err) {
-    const error = new HttpError("Creating place failed, please try again", 500);
-    return next(error);
-  }
+    await imageRef.save(image, {
+      metadata: { contentType: req.file.mimetype },
+    });
+    const imageUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/places/${imageName}`;
 
-  if (!user) {
-    const error = new HttpError("Could not find user for provided id", 404);
-    return next(error);
-  }
+    const createdPlace = new Place({
+      title,
+      description,
+      address,
+      location: coordinates,
+      image: imageUrl,
+      creator: req.userData.userId,
+    });
 
-  try {
-    const sess = await mongoose.startSession();
-    sess.startTransaction();
-    await createdPlace.save({ session: sess });
-    user.places.push(createdPlace);
-    await user.save({ session: sess });
-    await sess.commitTransaction();
-  } catch (err) {
-    const error = new HttpError(
-      "Creating place failed, please try again.",
-      500
-    );
-    return next(error);
-  }
+    let user;
+    try {
+      user = await User.findById(req.userData.userId);
+    } catch (err) {
+      const error = new HttpError("Creating place failed, please try again", 500);
+      return next(error);
+    }
 
-  res.status(201).json({ place: createdPlace });
+    if (!user) {
+      const error = new HttpError("Could not find user for provided id", 404);
+      return next(error);
+    }
+
+    try {
+      const sess = await mongoose.startSession();
+      sess.startTransaction();
+      await createdPlace.save({ session: sess });
+      user.places.push(createdPlace);
+      await user.save({ session: sess });
+      await sess.commitTransaction();
+    } catch (err) {
+      const error = new HttpError("Creating place failed, please try again.", 500);
+      return next(error);
+    }
+
+    res.status(201).json({ place: createdPlace });
+  } catch (error) {
+    return next(new HttpError("Image upload failed, please try again.", 500));
+  }
 };
 
 const updatePlace = async (req, res, next) => {
@@ -160,6 +174,7 @@ const updatePlace = async (req, res, next) => {
 
   res.status(200).json({ place: place.toObject({ getters: true }) });
 };
+
 const deletePlace = async (req, res, next) => {
   const placeId = req.params.pid;
 
@@ -167,10 +182,7 @@ const deletePlace = async (req, res, next) => {
   try {
     place = await Place.findById(placeId).populate("creator");
   } catch (err) {
-    const error = new HttpError(
-      "Something went wrong, could not delete place.",
-      500
-    );
+    const error = new HttpError("Something went wrong, could not delete place.", 500);
     return next(error);
   }
 
@@ -179,18 +191,10 @@ const deletePlace = async (req, res, next) => {
     return next(error);
   }
 
-  //dont need to use toString here as we used above because idher creator holds the full user object, and uski .id gives us a string already
-  // uper wale main we had creator as the creator property of a specific place, which is just an id
-  // tou basically uper wale main in creator we had Id, and in this one we have user/creator object
   if (place.creator.id !== req.userData.userId) {
-    const error = new HttpError(
-      "You are not allowed to delete this place.",
-      401
-    );
+    const error = new HttpError("You are not allowed to delete this place.", 401);
     return next(error);
   }
-
-  const imagePath = place.image;
 
   try {
     const sess = await mongoose.startSession();
@@ -200,16 +204,11 @@ const deletePlace = async (req, res, next) => {
     await place.creator.save({ session: sess });
     await sess.commitTransaction();
   } catch (err) {
-    const error = new HttpError(
-      "Something went wrong, could not delete place.",
-      500
-    );
+    const error = new HttpError("Something went wrong, could not delete place.", 500);
     return next(error);
   }
 
-  fs.unlink(imagePath, (err) => {
-    console.log(err);
-  });
+  // No local file deletion needed
 
   res.status(200).json({ message: "Deleted place." });
 };

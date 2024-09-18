@@ -19,6 +19,16 @@ const getUsers = async (req, res, next) => {
   res.json({ users: users.map((user) => user.toObject({ getters: true })) });
 };
 
+// Helper function to upload image to Firebase
+const uploadImageToFirebase = async (imageBuffer, mimetype) => {
+  const imageName = uuidv1() + '.' + MIME_TYPE_MAP[mimetype];
+  const imageRef = bucket.file('users/' + imageName);
+  await imageRef.save(imageBuffer, {
+    metadata: { contentType: mimetype },
+  });
+  return `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/users/${imageName}`;
+};
+
 const signup = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -59,10 +69,20 @@ const signup = async (req, res, next) => {
     return next(error);
   }
 
+    // Handle image upload if an image is provided
+    let imageUrl = '';
+    if (req.file) {
+      try {
+        imageUrl = await uploadImageToFirebase(req.file.buffer, req.file.mimetype);
+      } catch (err) {
+        return next(new HttpError('Image upload failed, please try again.', 500));
+      }
+    }
+
   const createdUser = User({
     name,
     email,
-    image: "",//req.file.path,
+    image: imageUrl,
     password: hashedPassword,
     places: [],
   });
