@@ -1,5 +1,6 @@
 const fs = require("fs");
 const { bucket } = require("../firebase-config");
+const { getStorage, getDownloadURL } = require('firebase-admin/storage');
 const { validationResult } = require("express-validator");
 const mongoose = require("mongoose");
 const { v1: uuidv1 } = require('uuid');
@@ -91,9 +92,20 @@ const createPlace = async (req, res, next) => {
       metadata: { contentType: req.file.mimetype },
     });
 
-    const res = await imageRef.makePublic();
+    //const res = await imageRef.makePublic();
 
-    const imageUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/places/${imageName}`;
+      // Generate a signed URL for temporary access
+    // const [signedUrl] = await imageRef.getSignedUrl({
+    // action: 'read',
+    // expires: '03-09-2491', // Set expiration date for the URL
+    // });
+
+    // const imageUrl = signedUrl;
+
+    const imageUrl =  await getDownloadURL(imageRef);
+
+
+    //const imageUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/places/${imageName}`;
 
     const createdPlace = new Place({
       title,

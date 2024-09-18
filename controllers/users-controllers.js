@@ -1,6 +1,7 @@
 const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
 const { bucket } = require("../firebase-config");
+const { getStorage, getDownloadURL } = require('firebase-admin/storage');
 const jwt = require("jsonwebtoken");
 const { v1: uuidv1 } = require('uuid');
 const HttpError = require("../models/http-error");
@@ -35,10 +36,12 @@ const uploadImageToFirebase = async (imageBuffer, mimetype) => {
     metadata: { contentType: mimetype },
   });
 
-  const res = await imageRef.makePublic();
+  const downloadURL= await getDownloadURL(imageRef);
 
+  //const res = await imageRef.makePublic();
 
-  return `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/users/${imageName}`;
+  return downloadURL;
+  //return `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/users/${imageName}`;
 };
 
 const signup = async (req, res, next) => {
